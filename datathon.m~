@@ -1,0 +1,119 @@
+addpath('../Data');
+addpath('../Package/lr');
+
+%% Read geo data
+read_geo;
+%% Read uber data
+read_uber;
+
+%% Set the constant
+numRegion = 195;
+
+%% Process
+longitude = geographic(1:2:end, :);
+latitude = geographic(2:2:end, :);
+
+%% Visualize polygon
+% coordinates = [longitude(:, 1), latitude(:, 1)];
+% figure;
+% hold on;
+% plot(coordinates(1,1), coordinates(1,2), 'r*');
+% plot(coordinates(:, 1), coordinates(:,2), '-o');
+
+%% Point in polygon test
+[m_region, row, col] = find_region(m_loc_uber, longitude, latitude);
+
+% %% Visualize region distribution
+% bar(1:numRegion, sum(m_region));
+% hold on;
+% title('Region distribution over different regions (Uber)');
+% xlabel('Region ID');
+% ylabel('# of trips');
+
+%% Parse time
+time = cellfun(@(x) sscanf(x,'%d/%d/%d %d:%d'),dataArray{1},'UniformOutput',false);
+
+%% test
+m_time = cell2mat(time);
+v_date = m_time(1:5:end) .* 100 + m_time(2:5:end);
+v_udate = unique(v_date);
+v_hour = m_time(4:5:end);
+
+%% Create the feature matrix
+% row: region, col: time, val: num of cars
+m_train_feature = zeros(24, numRegion, length(v_udate));
+
+for j = 1:length(v_udate)
+    for i = 0:23
+        m_train_feature(i+1, :, j) = sum(m_region(v_hour == i & v_date == v_udate(j), :)) + 1;
+    end
+end
+
+%% Visualize Feature
+surf(m_train_feature(:,:,1));
+hold on;
+title('Demand distribution over time and region');
+xlabel('Region ID(1-195)');
+ylabel('Time(Hour)');
+zlabel('Demand(# of Trips)');
+
+%% Create binary feature matrix
+m_binary_feature = zeros(24 * numRegion * length(v_udate), 24 + numRegion);
+v_demand = zeros(24 * numRegion * length(v_udate), 1);
+
+for i = 1:size(m_train_feature, 1)
+    for j = 1:size(m_train_feature, 2)
+        for k = 1:length(v_udate)
+            timeFeature = zeros(1, 24);
+            timeFeature(i) = 1;
+            regionFeature = zeros(1, numRegion);
+            regionFeature(j) = 1;
+            lindex = sub2ind(size(m_train_feature), i, j, k);
+            m_binary_feature(lindex, :) = [timeFeature, regionFeature]; 
+            v_demand(lindex) = m_train_feature(i,j,k);
+        end
+    end
+end
+
+%% Linear Regression
+m = length(v_demand);
+X = m_binary_feature;
+X = [ones(m,1) X];
+w = X \ v_demand;
+
+y_p = X*w;
+
+
+%% Linear Regression
+X = m_binary_feature; % Features
+y = v_demand; % Housing Prices
+m = length(y); % Number of training examples
+d = size(X,2); % Number of features.
+theta = zeros(d+1,1); % Initialize thetas to zero.
+alpha = 0.05; % Learning rate
+numIters = 10000;
+X = [ones(m,1) X]; % Add a col of 1's for the x0 terms
+[theta, CostHistory] = gradientDescent(X, theta, y, alpha, numIters);
+
+%% SVM Regression
+X = m_binary_feature;
+Mdl = fitrsvm(X,y);
+
+%% Visualize output
+y_true = sum(m_train_feature, 3);
+
+y_predict = zeros(24, numRegion)
+for i = 1:size(m_train_feature, 1)
+    for j = 1:size(m_train_feature, 2)
+            timeFeature = zeros(1, 24);
+            timeFeature(i) = 1;
+            regionFeature = zeros(1, numRegion);
+            regionFeature(j) = 1;
+            y = [1, ]
+    end
+end
+
+
+
+
+
